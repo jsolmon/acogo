@@ -7,17 +7,23 @@ import (
 
 type Ant interface {
 	UpdateDestination(*Node)
-	ChoosePath([]Edge) Edge
-	AddPheremone(*Edge)
+	ChoosePath([]Edge) (*Edge, bool)
+	PheremoneOut() float64
 }
 
 type SimpleAnt struct {
 	LastNodeId  int
 	Destination NodeType
+
+	MaxSteps   int
+	StepsCount int
 }
 
-func NewSimpleAnt() *SimpleAnt {
-	a := SimpleAnt{LastNodeId: 0, Destination: Goal}
+func NewSimpleAnt(maxSteps int) *SimpleAnt {
+	a := SimpleAnt{LastNodeId: 0,
+		Destination: Goal,
+		MaxSteps:    maxSteps,
+		StepsCount:  0}
 	return &a
 }
 
@@ -31,34 +37,39 @@ func (a *SimpleAnt) UpdateDestination(n *Node) {
 	}
 }
 
-func (a *SimpleAnt) ChoosePath(edges []Edge) *Edge {
+func (a *SimpleAnt) ChoosePath(edges []Edge) (*Edge, bool) {
+	if a.StepsCount >= a.MaxSteps {
+		return nil, true
+	}
+	a.StepsCount += 1
+
 	total := a.sumPheremones(edges)
 
 	r := rand.New(rand.NewSource(time.Now().Unix()))
-	choice := r.Intn(total)
+	choice := r.Float64()
 
-	pos := 0
+	pos := 0.0
 	for _, e := range edges {
 		if e.EndNodeId != a.LastNodeId {
-			pos = pos + e.Pheremone
-			if choice <= pos {
+			pos += e.Pheremone()
+			if choice <= pos/total {
 				a.LastNodeId = e.StartNodeId
-				return &e
+				return &e, false
 			}
 		}
 	}
-	return &edges[len(edges)-1]
+	return &edges[len(edges)-1], false
 }
 
-func (a *SimpleAnt) AddPheremone(e *Edge) {
-	e.Weight = e.Weight + 1
+func (a *SimpleAnt) PheremoneOut() float64 {
+	return 1.0
 }
 
-func (a *SimpleAnt) sumPheremones(edges []Edge) int {
-	total := 0
+func (a *SimpleAnt) sumPheremones(edges []Edge) float64 {
+	total := 0.0
 	for _, e := range edges {
 		if e.EndNodeId != a.LastNodeId {
-			total = total + e.Pheremone
+			total += e.Pheremone()
 		}
 	}
 	return total

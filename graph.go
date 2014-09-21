@@ -1,12 +1,16 @@
 package main
 
+import (
+	"sync"
+)
+
 // TODO: Constructors/Generators for graph
-// TODO: Stopping when finished
 // TODO: Diminishing pheromones in edges
 
 type Edge struct {
 	Path        chan Ant
-	Pheremone   int
+	pheremone   float64
+	mu          sync.Mutex
 	Weight      int
 	StartNodeId int
 	EndNodeId   int
@@ -33,8 +37,23 @@ func (n *Node) runAnts(e *Edge) {
 	for {
 		ant := <-e.Path
 		ant.UpdateDestination(n)
-		next := ant.ChoosePath(n.OutEdges)
-		ant.AddPheremone(&next)
+		next, done := ant.ChoosePath(n.OutEdges)
+		if done {
+			break
+		}
+		e.AddPheremone(ant.PheremoneOut())
 		next.Path <- ant
 	}
+}
+
+func (e *Edge) Pheremone() float64 {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.pheremone
+}
+
+func (e *Edge) AddPheremone(f float64) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.pheremone += f
 }
