@@ -1,14 +1,15 @@
 package main
 
 import (
+	"errors"
 	"math/rand"
+	"sync"
 	"time"
 )
 
 type Ant interface {
-	UpdateDestination(*Node)
-	ChoosePath([]Edge) (*Edge, bool)
-	PheremoneOut() float64
+	ChoosePath(*Node) (*Edge, bool)
+	PheremoneAmt() float64
 }
 
 type SimpleAnt struct {
@@ -17,17 +18,20 @@ type SimpleAnt struct {
 
 	MaxSteps   int
 	StepsCount int
+	waitGroup  *sync.WaitGroup
 }
 
-func NewSimpleAnt(maxSteps int) *SimpleAnt {
-	a := SimpleAnt{LastNodeId: 0,
+func NewSimpleAnt(maxSteps int, wg *sync.WaitGroup) *SimpleAnt {
+	a := SimpleAnt{
+		LastNodeId:  0,
 		Destination: Goal,
 		MaxSteps:    maxSteps,
-		StepsCount:  0}
+		StepsCount:  0,
+		waitGroup:   wg}
 	return &a
 }
 
-func (a *SimpleAnt) UpdateDestination(n *Node) {
+func (a *SimpleAnt) updateDestination(n *Node) {
 	if a.Destination == n.Type {
 		if a.Destination == Home {
 			a.Destination = Goal
@@ -37,31 +41,33 @@ func (a *SimpleAnt) UpdateDestination(n *Node) {
 	}
 }
 
-func (a *SimpleAnt) ChoosePath(edges []Edge) (*Edge, bool) {
+func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, error) {
 	if a.StepsCount >= a.MaxSteps {
-		return nil, true
+		a.waitGroup.Done()
+		return nil, errors.New("maximum steps reached")
 	}
 	a.StepsCount += 1
+	a.updateDestination(node)
 
-	total := a.sumPheremones(edges)
+	total := a.sumPheremones(node.OutEdges)
 
 	r := rand.New(rand.NewSource(time.Now().Unix()))
 	choice := r.Float64()
 
 	pos := 0.0
-	for _, e := range edges {
+	for _, e := range node.OutEdges {
 		if e.EndNodeId != a.LastNodeId {
 			pos += e.Pheremone()
 			if choice <= pos/total {
 				a.LastNodeId = e.StartNodeId
-				return &e, false
+				return &e, nil
 			}
 		}
 	}
-	return &edges[len(edges)-1], false
+	return &node.OutEdges[len(node.OutEdges)-1], nil
 }
 
-func (a *SimpleAnt) PheremoneOut() float64 {
+func (a *SimpleAnt) PheremoneAmt() float64 {
 	return 1.0
 }
 

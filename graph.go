@@ -2,50 +2,63 @@ package main
 
 import (
 	"sync"
+	"time"
 )
 
 // TODO: Constructors/Generators for graph
-// TODO: Diminishing pheromones in edges
-
-type Edge struct {
-	Path        chan Ant
-	pheremone   float64
-	mu          sync.Mutex
-	Weight      int
-	StartNodeId int
-	EndNodeId   int
-}
-
-type Node struct {
-	Id       int
-	InEdges  []Edge
-	OutEdges []Edge
-	Type     NodeType
-}
 
 type Graph struct {
 	Nodes []Node
 }
 
-func (n *Node) Run() {
+type Node struct {
+	Id          int
+	InEdges     []Edge
+	OutEdges    []Edge
+	Type        NodeType
+	DecayFactor float64
+}
+
+func (n *Node) Run(done chan int) {
 	for _, e := range n.InEdges {
 		go n.runAnts(&e)
+	}
+
+	ticker := time.NewTicker(1 * time.Millisecond)
+	for {
+		select {
+		case <-done: //all ants have completed, exit function
+			return
+		case <-ticker.C:
+			for _, e := range n.InEdges {
+				e.AddPheremone(n.DecayFactor)
+			}
+		}
 	}
 }
 
 func (n *Node) runAnts(e *Edge) {
 	for {
 		ant := <-e.Path
-		ant.UpdateDestination(n)
-		next, done := ant.ChoosePath(n.OutEdges)
-		if done {
-			break
+		next, err := ant.ChoosePath(n)
+		if err {
+			continue
 		}
-		e.AddPheremone(ant.PheremoneOut())
+		e.AddPheremone(ant.PheremoneAmt())
 		next.Path <- ant
 	}
 }
 
+type Edge struct {
+	Path        chan Ant
+	StartNodeId int
+	EndNodeId   int
+
+	pheremone float64
+	mu        sync.Mutex
+}
+
+//TODO: Do this using channels instead of locks to make more "go-like"
 func (e *Edge) Pheremone() float64 {
 	e.mu.Lock()
 	defer e.mu.Unlock()
