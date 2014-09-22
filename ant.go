@@ -8,7 +8,7 @@ import (
 )
 
 type Ant interface {
-	ChoosePath(*Node) (*Edge, bool)
+	ChoosePath(*Node) (*Edge, error)
 	PheremoneAmt() float64
 }
 
@@ -60,18 +60,18 @@ func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, error) {
 			pos += e.Pheremone()
 			if choice <= pos/total {
 				a.LastNodeId = e.StartNodeId
-				return &e, nil
+				return e, nil
 			}
 		}
 	}
-	return &node.OutEdges[len(node.OutEdges)-1], nil
+	return node.OutEdges[len(node.OutEdges)-1], nil
 }
 
 func (a *SimpleAnt) PheremoneAmt() float64 {
 	return 1.0
 }
 
-func (a *SimpleAnt) sumPheremones(edges []Edge) float64 {
+func (a *SimpleAnt) sumPheremones(edges []*Edge) float64 {
 	total := 0.0
 	for _, e := range edges {
 		if e.EndNodeId != a.LastNodeId {
