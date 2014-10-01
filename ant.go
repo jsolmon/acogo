@@ -1,70 +1,86 @@
 package main
 
 import (
-	"errors"
-	"math/rand"
 	"sync"
-	"time"
 )
 
 type Ant interface {
-	ChoosePath(*Node) (*Edge, error)
-	PheremoneAmt() float64
+	ChoosePath(*Node) (*Edge, bool)
+	MarkPath(*Graph)
 }
 
 type SimpleAnt struct {
-	LastNodeId  int
-	Destination NodeType
+	LastNodeId int
 
-	MaxSteps   int
-	StepsCount int
+	StepsTaken []int
+	DepositAmt float64
+	RandomSrc  chan chan float64
 	waitGroup  *sync.WaitGroup
 }
 
-func NewSimpleAnt(maxSteps int, wg *sync.WaitGroup) *SimpleAnt {
-	a := SimpleAnt{
-		LastNodeId:  0,
-		Destination: Goal,
-		MaxSteps:    maxSteps,
-		StepsCount:  0,
-		waitGroup:   wg}
-	return &a
-}
-
-func (a *SimpleAnt) updateDestination(n *Node) {
-	if a.Destination == n.Type {
-		if a.Destination == Home {
-			a.Destination = Goal
-		} else if a.Destination == Goal {
-			a.Destination = Home
-		}
+func NewSimpleAnt(lastNodeId int, depositAmt float64, randSrc chan chan float64, wg *sync.WaitGroup) *SimpleAnt {
+	return &SimpleAnt{
+		LastNodeId: lastNodeId,
+		DepositAmt: depositAmt,
+		StepsTaken: make([]int, 0, 100),
+		RandomSrc:  randSrc,
+		waitGroup:  wg,
 	}
 }
 
-func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, error) {
-	if a.StepsCount >= a.MaxSteps {
+func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, bool) {
+	a.StepsTaken = append(a.StepsTaken, node.Id)
+
+	if node.Type == Goal {
 		a.waitGroup.Done()
-		return nil, errors.New("maximum steps reached")
+		return nil, true
 	}
-	a.StepsCount += 1
-	a.updateDestination(node)
 
 	total := a.sumPheremones(node.OutEdges)
 
-	r := rand.New(rand.NewSource(time.Now().Unix()))
-	choice := r.Float64()
+	// use RandomSrc to get random float64
+	randChan := make(chan float64)
+	a.RandomSrc <- randChan
+	choice := <-randChan
 
 	pos := 0.0
 	for _, e := range node.OutEdges {
 		if e.EndNodeId != a.LastNodeId {
 			pos += e.Pheremone()
 			if choice <= pos/total {
-				a.LastNodeId = e.StartNodeId
-				return e, nil
+				a.LastNodeId = node.Id
+				return e, false
 			}
 		}
 	}
-	return node.OutEdges[len(node.OutEdges)-1], nil
+	a.LastNodeId = node.Id
+	return node.OutEdges[len(node.OutEdges)-1], false
+}
+
+func (a *SimpleAnt) MarkPath(g *Graph) {
+	unlooped := unloop(a.StepsTaken)
+	g.MarkPath(unlooped, a.DepositAmt)
+}
+
+func unloop(steps []int) []int {
+	// create a map of the last index at which each node occurs
+	lastIndices := make(map[int]int, 100)
+	for idx, node := range steps {
+		lastIndices[node] = idx
+	}
+
+	idx := 0
+	unlooped := make([]int, 0, len(steps))
+	for idx < len(steps) {
+		node := steps[idx]
+		unlooped = append(unlooped, node)
+		if idx == lastIndices[node] {
+			idx++
+		} else {
+			idx = lastIndices[node] + 1
+		}
+	}
+	return unlooped
 }
 
 func (a *SimpleAnt) PheremoneAmt() float64 {
