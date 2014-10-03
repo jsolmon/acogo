@@ -1,4 +1,4 @@
-package main
+package acogo
 
 import (
 	"fmt"
@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-func TestChoosePath(t *testing.T) {
+func TestChooseNext(t *testing.T) {
 	randSource := RandomSource{make(chan chan float64), rand.New(rand.NewSource(time.Now().Unix()))}
 	go randSource.Run()
 
 	var wg sync.WaitGroup
-	ant := NewSimpleAnt(1, 1.0, randSource.requestChan, &wg)
+	ant := NewSimpleAnt(1, 1.0, randSource.RequestChan, &wg)
 
 	edges := []*Edge{NewEdge(0, 1), NewEdge(0, 6), NewEdge(0, 3), NewEdge(0, 10)}
 	edges[0].pheremone = 5.0
@@ -31,7 +31,7 @@ func TestChoosePath(t *testing.T) {
 
 	for i := 0; i < 1000; i++ {
 		ant.LastNodeId = 1
-		choice, _ := ant.ChoosePath(node)
+		choice, _ := ant.ChooseNext(node)
 		switch choice {
 		case edges[0]:
 			edge0Count++
@@ -43,6 +43,7 @@ func TestChoosePath(t *testing.T) {
 			edge3Count++
 		}
 	}
+	// Should never choose edge0 because that is the LastNodeId
 	if edge0Count != 0 {
 		t.Error(fmt.Sprintf("edge0 count should be 0 but was %v\n", edge0Count))
 	}
@@ -66,7 +67,7 @@ func TestSumPheremones(t *testing.T) {
 	edges[2].pheremone = 4.0
 	edges[3].pheremone = 8.0
 
-	// should sum all but 0->1 node
+	// should sum all but 0->1 node which matches ant's LastNodeId
 	pheremone := ant.sumPheremones(edges)
 	expected := 14.0
 

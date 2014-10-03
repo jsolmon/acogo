@@ -1,9 +1,8 @@
-package main
+package acogo
 
 import (
 	"fmt"
 	"math"
-	"sync"
 )
 
 type NodeType int
@@ -14,13 +13,22 @@ const (
 	Path
 )
 
+// Graph struct holds nodes and edges that ants travel on
 type Graph struct {
-	Nodes       []*Node
-	HomeIdx     int
-	GoalIdx     int
+	// List of nodes containing edges
+	Nodes []*Node
+	// Index of the Home/start node
+	HomeIdx int
+	// Index of the Goal node
+	GoalIdx int
+	// How much the pheremone on each edge decreases after each round of ants
+	// reaches the goal.
 	DecayFactor float64
 }
 
+// NewGraph generates a new graph. The default graph at this time is a square of
+// dim * dim nodes with each node having an edge to adjacent nodes above, below,
+// left, right, and at all four diagonals.
 func NewGraph(dimension, homeNode, goalNode int, decayFactor float64) *Graph {
 	// generate edges and put them in a [][]*Edge 2d slice
 	edges := generateEdges(dimension)
@@ -37,12 +45,17 @@ func NewGraph(dimension, homeNode, goalNode int, decayFactor float64) *Graph {
 	}
 }
 
+// Run calls Run on each node which calls Run on each edge initializing go
+// routines which pass ants from edge to edge in the graph.
 func (g *Graph) Run() {
 	for _, n := range g.Nodes {
 		go func(n Node) { n.Run() }(*n)
 	}
 }
 
+// generateEdges generates a slice of edges for a dim*dim graph such that each
+// edge connects to adjacent nodes above, below, left, right, and on all four
+// diagonals.
 func generateEdges(dim int) [][]*Edge {
 	edges := make([][]*Edge, dim*dim)
 	for i := 0; i < dim*dim; i++ {
@@ -86,6 +99,8 @@ func generateEdges(dim int) [][]*Edge {
 	return edges
 }
 
+// generateNodes generates dim*dim nodes based and gives each the in/out edges
+// mapped in the 2D slice of edges.
 func generateNodes(edges [][]*Edge, dim, homeNode, goalNode int) []*Node {
 	// in edges, each row is outgoing edges, each column is incoming edges for a given node
 	nodes := make([]*Node, dim*dim)
@@ -120,14 +135,17 @@ func generateNodes(edges [][]*Edge, dim, homeNode, goalNode int) []*Node {
 	return nodes
 }
 
+// Dissipate subtracts g.DecayFactor pheremone from each edge in the graph.
 func (g *Graph) Dissipate() {
 	for _, n := range g.Nodes {
 		for _, e := range n.InEdges {
-			e.AddPheremone(g.DecayFactor)
+			e.AddPheremone(-1 * g.DecayFactor)
 		}
 	}
 }
 
+// MarkPath takes in a list of nodeIds representing the path an ant followed
+// and adds depositAmt pheremone to each edge along the path.
 func (g *Graph) MarkPath(steps []int, depositAmt float64) {
 	lastStep := steps[0]
 	for _, nodeId := range steps[0:] {
@@ -137,11 +155,17 @@ func (g *Graph) MarkPath(steps []int, depositAmt float64) {
 	}
 }
 
+// Node struct represents a node in the graph. It contains slices of incoming
+// and outgoing edges.
 type Node struct {
-	Id       int
-	InEdges  []*Edge
+	// Id is the numeric identity of the node.
+	Id int
+	// InEdges are edges coming into the node.
+	InEdges []*Edge
+	// OutEdges are edges going out of the node.
 	OutEdges []*Edge
-	Type     NodeType
+	// Type is the type of node, one of Goal, Path, or Home.
+	Type NodeType
 }
 
 func NewNode(id int, inEdges []*Edge, outEdges []*Edge, t NodeType) *Node {
@@ -153,6 +177,9 @@ func NewNode(id int, inEdges []*Edge, outEdges []*Edge, t NodeType) *Node {
 	}
 }
 
+// Run starts up a go routine for each incoming edge in the node which will
+// pull ants off of the edge's channel and push them onto their next chosen
+// node.
 func (n *Node) Run() {
 	for _, e := range n.InEdges {
 		edge := e
@@ -160,10 +187,13 @@ func (n *Node) Run() {
 	}
 }
 
+// runAnts pulls ants from the incoming channel and then pushes them off on
+// their chosen path. If the ant is at the goal, it wil not be pushed to
+// the next channel.
 func (n *Node) runAnts(e *Edge) {
 	for {
 		ant := <-e.Path
-		next, atGoal := ant.ChoosePath(n)
+		next, atGoal := ant.ChooseNext(n)
 		if atGoal { //ant has reached goal - no more to do
 			continue
 		}
@@ -171,6 +201,8 @@ func (n *Node) runAnts(e *Edge) {
 	}
 }
 
+// MarkEdge adds depositAmt pheremone to the correct incoming edge in the
+// node.
 func (n *Node) MarkEdge(from int, depositAmt float64) {
 	for _, e := range n.InEdges {
 		if e.StartNodeId == from {
@@ -179,15 +211,21 @@ func (n *Node) MarkEdge(from int, depositAmt float64) {
 	}
 }
 
+// Edge represents a directional edge in the graph.
 type Edge struct {
-	Path        chan Ant
+	// Path is the channel on which the edge moves ants from the startNode
+	// to the endNode
+	Path chan Ant
+	// StartNodeId is Id of the starting node in the edge
 	StartNodeId int
-	EndNodeId   int
+	// EndNodeId is the Id of the ending node in the edge
+	EndNodeId int
 
+	// pheremone is the amount of pheremone currently on the edge
 	pheremone float64
-	mu        sync.RWMutex
 }
 
+// NewEdge creates a new edge with the starting pheremone amount of 10.0.
 func NewEdge(startId, endId int) *Edge {
 	return &Edge{
 		Path:        make(chan Ant, 5),
@@ -197,14 +235,18 @@ func NewEdge(startId, endId int) *Edge {
 	}
 }
 
+// Pheremone returns the amount of pheremone present on the edge.
 func (e *Edge) Pheremone() float64 {
 	return e.pheremone
 }
 
+// AddPheremone adds pheremone to the edge. AddPheremone will not allow the
+// amount of pheremone on the edge to go below 0.1.
 func (e *Edge) AddPheremone(f float64) {
 	e.pheremone = math.Max(e.pheremone+f, 0.1)
 }
 
+// String prints edges as "StartNodeId -> EndNodeId: Pheremone".
 func (e Edge) String() string {
 	return fmt.Sprintf("%d -> %d: %.2f", e.StartNodeId, e.EndNodeId, e.pheremone)
 }

@@ -1,23 +1,32 @@
-package main
+package acogo
 
 import (
 	"sync"
 )
 
+// Ant is an interface for all Ants used in acogo
 type Ant interface {
-	ChoosePath(*Node) (*Edge, bool)
+	ChooseNext(*Node) (*Edge, bool)
 	MarkPath(*Graph)
 }
 
+// SimpleAnt is the most basic Ant. It probabilistically chooses a path based on
+// the relative amount of pheremone in all paths.
 type SimpleAnt struct {
+	// Last node visited
 	LastNodeId int
 
+	// A slice of NodeIds visited in the current move toward goal
 	StepsTaken []int
+	// Amount of pheremone left at each step along the path
 	DepositAmt float64
-	RandomSrc  chan chan float64
-	waitGroup  *sync.WaitGroup
+	// Source of randomness for making probabilistic path decisions
+	RandomSrc chan chan float64
+	// WaitGroup for reporting back to the system when the goal has been reached
+	waitGroup *sync.WaitGroup
 }
 
+// NewSimpleAnt creates a SimpleAnt with the input parameters.
 func NewSimpleAnt(lastNodeId int, depositAmt float64, randSrc chan chan float64, wg *sync.WaitGroup) *SimpleAnt {
 	return &SimpleAnt{
 		LastNodeId: lastNodeId,
@@ -28,7 +37,11 @@ func NewSimpleAnt(lastNodeId int, depositAmt float64, randSrc chan chan float64,
 	}
 }
 
-func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, bool) {
+// ChooseNext probabilistically chooses the next edge in the graph to move down
+// based on the amount of pheremone on each edge. ChooseNext will not choose
+// an edge leading to the node the ant just visited unless it is the only edge
+// available on the node.
+func (a *SimpleAnt) ChooseNext(node *Node) (*Edge, bool) {
 	a.StepsTaken = append(a.StepsTaken, node.Id)
 
 	if node.Type == Goal {
@@ -57,11 +70,17 @@ func (a *SimpleAnt) ChoosePath(node *Node) (*Edge, bool) {
 	return node.OutEdges[len(node.OutEdges)-1], false
 }
 
+// MarkPath lays down pheremone based on the path the ant took to from home
+// to goal. MarkPath will "unloop" the path meaning that any loops in the
+// original path will be eliminated.
 func (a *SimpleAnt) MarkPath(g *Graph) {
 	unlooped := unloop(a.StepsTaken)
 	g.MarkPath(unlooped, a.DepositAmt)
 }
 
+// unloop takes the steps taken and eliminates any loops. This is done by always
+// choosing the last instance that a given node was passed through, e.g. if the
+// sequence of nodes is [1, 2, 4, 5, 2, 6, 7], it will become [1, 2, 6, 7].
 func unloop(steps []int) []int {
 	// create a map of the last index at which each node occurs
 	lastIndices := make(map[int]int, 100)
@@ -83,10 +102,9 @@ func unloop(steps []int) []int {
 	return unlooped
 }
 
-func (a *SimpleAnt) PheremoneAmt() float64 {
-	return 1.0
-}
-
+// sumPheremones totals the pheremones present on the slice of edges passed in.
+// sumPheremones does not count pheremones from the edge the ant most recently
+// visited.
 func (a *SimpleAnt) sumPheremones(edges []*Edge) float64 {
 	total := 0.0
 	for _, e := range edges {
