@@ -1,3 +1,7 @@
+# acogo
+
+[![Build Status](https://travis-ci.org/jsolmon/acogo.png?branch=master)](https://travis-ci.org/jsolmon/acogo)
+
 Package acogo provides a framework for playing with ant colony optimization.
 
 `acogo` will run a set number of ants from start to home in the graph and then
