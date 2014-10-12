@@ -37,29 +37,35 @@ is subtracted from all edges.
 When all ants have completed iterations iterations, the pheremone values for all
 edges are printed to the screen. (Visualization will be added soon!)
 */
-package acogo
+package main
 
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"sync"
 	"time"
 )
 
 func main() {
-	var antCount = *flag.Int("antcount", 20, "the number of ants to create")
-	var depositAmt = *flag.Float64("depositamt", 1.0, "amount of pheremone deposited by ant")
-	var iterations = *flag.Int("iterations", 500, "the number times each ant will find the goal node")
-	var decayFactor = *flag.Float64("decay", 0.3, "the amount of pheremone dissipated after each round")
-	var dimension = *flag.Int("dimension", 6, "the number of nodes on each side of the square graph")
-	var startNode = *flag.Int("start", 0, "the index of the node where ants begin")
-	var goalNode = *flag.Int("goal", dimension*dimension-1, "the index of the vertex ants are trying to reach")
+	var antCount = flag.Int("antcount", 20, "the number of ants to create")
+	var depositAmt = flag.Float64("depositamt", 1.0, "amount of pheremone deposited by ant")
+	var iterations = flag.Int("iterations", 500, "the number times each ant will find the goal node")
+	var decayFactor = flag.Float64("decay", 0.3, "the amount of pheremone dissipated after each round")
+	var dimension = flag.Int("dimension", 6, "the number of nodes on each side of the square graph")
+	var startNode = flag.Int("start", 0, "the index of the node where ants begin")
+	var goalNode = flag.Int("goal", -1, "the index of the vertex ants are trying to reach")
+
+	flag.Parse()
+	if *goalNode == -1 {
+		*goalNode = *dimension**dimension - 1
+	}
 
 	// initialize randomness source
 
 	// create and start graph
-	graph := NewGraph(dimension, startNode, goalNode, decayFactor)
+	graph := NewGraph(*dimension, *startNode, *goalNode, *decayFactor)
 	graph.Run()
 
 	// initialize source of randomness
@@ -70,13 +76,13 @@ func main() {
 	homeNode := graph.Nodes[graph.HomeIdx]
 	startEdge := homeNode.InEdges[0]
 
-	for i := 0; i < iterations; i++ {
+	for i := 0; i < *iterations; i++ {
 		var wg sync.WaitGroup
-		wg.Add(antCount)
-		ants := make([]Ant, 0, antCount)
+		wg.Add(*antCount)
+		ants := make([]Ant, 0, *antCount)
 
-		for i := 0; i < antCount; i++ {
-			ants = append(ants, NewSimpleAnt(graph.HomeIdx, depositAmt, randSource.RequestChan, &wg))
+		for i := 0; i < *antCount; i++ {
+			ants = append(ants, NewSimpleAnt(graph.HomeIdx, *depositAmt, randSource.RequestChan, &wg))
 			startEdge.Path <- ants[i]
 		}
 
@@ -97,6 +103,10 @@ func main() {
 			fmt.Printf("%v\n", e)
 		}
 	}
+
+	maxPheremone := float64(*iterations) * float64(*antCount) * *depositAmt
+	viz := ToDotFormat(graph, maxPheremone)
+	ioutil.WriteFile("g.dot", []byte(viz.String()), 0777)
 }
 
 // RandomSource provides a shared source of randomness for ants via requests

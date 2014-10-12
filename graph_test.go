@@ -1,4 +1,4 @@
-package acogo
+package main
 
 import (
 	"fmt"
