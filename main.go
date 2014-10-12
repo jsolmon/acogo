@@ -7,7 +7,7 @@ Package acogo provides a framework for playing with ant colony optimization.
 Command line options:
 
 	antcount: The number of ants to create and run each iteration. Default 20.
-	depositamt: The amount of pheremone each ant deposits on their path. Default 1.0.
+	depositamt: The amount of pheromone each ant deposits on their path. Default 1.0.
 	iterations: The number of times each ant runs from home to goal. Default 500.
 	decay: The amount that pheromone on each edge decreases after each iteration. Default 0.3.
 	dimension: The number of nodes on each side of the square graph. Default 6.
@@ -24,25 +24,25 @@ four diagonals. For example, if dimension is 3, the graph look like:
 
 antcount ants will be placed at the start node on the graph and travel in the graph
 until they reach the goal node. At each node, the ant will probabilitstically chose
-which node to travel to next proportionate to the amount of pheremone on each
+which node to travel to next proportionate to the amount of pheromone on each
 outgoing node. Ants will not return to the node they just left unless that is the
 only option for exiting a particular node.
 
-Once all ants reach the goal node in a given iteration, depositamt pheremone will
+Once all ants reach the goal node in a given iteration, depositamt pheromone will
 be added to each edge that each ant traveled on. After reaching the goal, ants
 routes are unlooped, so an ant that traveled 1->4->5->2->4->8 would only lay down
-pheremone from 1->4->8. After all ant pheremone has been laid down, decay pheremone
+pheromone from 1->4->8. After all ant pheromone has been laid down, decay pheromone
 is subtracted from all edges.
 
-When all ants have completed iterations iterations, the pheremone values for all
-edges are printed to the screen. (Visualization will be added soon!)
+When all ants have completed iterations iterations, a DOT language representation
+of the final graph is written to stdout. Edge colors reflect how much pheromone
+is on a given edge with darker edges representing more pheromone.
 */
 package main
 
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"math/rand"
 	"sync"
 	"time"
@@ -50,12 +50,12 @@ import (
 
 func main() {
 	var antCount = flag.Int("antcount", 20, "the number of ants to create")
-	var depositAmt = flag.Float64("depositamt", 1.0, "amount of pheremone deposited by ant")
+	var depositAmt = flag.Float64("depositamt", 1.0, "amount of pheromone deposited by ant")
 	var iterations = flag.Int("iterations", 500, "the number times each ant will find the goal node")
-	var decayFactor = flag.Float64("decay", 0.3, "the amount of pheremone dissipated after each round")
+	var decayFactor = flag.Float64("decay", 0.3, "the amount of pheromone dissipated after each round")
 	var dimension = flag.Int("dimension", 6, "the number of nodes on each side of the square graph")
 	var startNode = flag.Int("start", 0, "the index of the node where ants begin")
-	var goalNode = flag.Int("goal", -1, "the index of the vertex ants are trying to reach")
+	var goalNode = flag.Int("goal", -1, "the index of the vertex ants are trying to reach, if unset will default to dimension * dimension - 1")
 
 	flag.Parse()
 	if *goalNode == -1 {
@@ -89,7 +89,7 @@ func main() {
 		// wg completes once all ants have reached the goal node
 		wg.Wait()
 
-		// cycle through ants and update pheremone based on their paths
+		// cycle through ants and update pheromone based on their paths
 		for _, ant := range ants {
 			ant.MarkPath(graph)
 		}
@@ -97,16 +97,12 @@ func main() {
 		graph.Dissipate()
 	}
 
-	// TODO: Visualization
-	for _, n := range graph.Nodes {
-		for _, e := range n.InEdges {
-			fmt.Printf("%v\n", e)
-		}
-	}
-
-	maxPheremone := float64(*iterations) * float64(*antCount) * *depositAmt
-	viz := ToDotFormat(graph, maxPheremone)
-	ioutil.WriteFile("g.dot", []byte(viz.String()), 0777)
+	// maxpheromone, the theoretical upper bound on the amount of pheromone on any
+	// one edge is calculated assuming every ant passed over that edge at every
+	// iteration
+	maxpheromone := float64(*iterations) * float64(*antCount) * *depositAmt
+	viz := ToDot(graph, maxpheromone)
+	fmt.Printf(viz.String())
 }
 
 // RandomSource provides a shared source of randomness for ants via requests

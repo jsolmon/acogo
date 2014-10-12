@@ -7,7 +7,10 @@ import (
 	"code.google.com/p/gographviz"
 )
 
-func ToDotFormat(g *Graph, max float64) *gographviz.Graph {
+// ToDot takes in an acogo Graph and transforms it into a DOT language
+// graph with the darkness of the edge color corresponding to the amount
+// of pheromone on the edge.
+func ToDot(g *Graph, max float64) *gographviz.Graph {
 	gv := gographviz.NewGraph()
 	gv.SetDir(true)
 
@@ -21,6 +24,8 @@ func ToDotFormat(g *Graph, max float64) *gographviz.Graph {
 	return gv
 }
 
+// nodeAttrs assigns DOT attributes to a node, assigning labels and
+// colors based on whether they are home or goal nodes.
 func nodeAttrs(n *Node) map[string]string {
 	attrs := make(map[string]string, 2)
 
@@ -37,13 +42,15 @@ func nodeAttrs(n *Node) map[string]string {
 	return attrs
 }
 
+// edgeAttrs assigns DOT attributes to a node, assigning darker colors
+// to nodes with more pheromone and lighter colors to nodes with less.
 func edgeAttrs(e *Edge, max float64) map[string]string {
 	attrs := make(map[string]string, 3)
 	attrs["penwidth"] = "3.0"
 	attrs["arrowType"] = "open"
 
 	// sets a minimum alpha value of 10 so edges with no traffic will still appear in the graph
-	alpha := int(e.pheremone/max*245) + 10
+	alpha := int(e.pheromone/max*245) + 10
 	color := fmt.Sprintf("\"#104E8B%X\"", alpha)
 	attrs["color"] = color
 

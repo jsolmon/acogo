@@ -11,14 +11,14 @@ type Ant interface {
 }
 
 // SimpleAnt is the most basic Ant. It probabilistically chooses a path based on
-// the relative amount of pheremone in all paths.
+// the relative amount of pheromone in all paths.
 type SimpleAnt struct {
 	// Last node visited
 	LastNodeId int
 
 	// A slice of NodeIds visited in the current move toward goal
 	StepsTaken []int
-	// Amount of pheremone left at each step along the path
+	// Amount of pheromone left at each step along the path
 	DepositAmt float64
 	// Source of randomness for making probabilistic path decisions
 	RandomSrc chan chan float64
@@ -38,7 +38,7 @@ func NewSimpleAnt(lastNodeId int, depositAmt float64, randSrc chan chan float64,
 }
 
 // ChooseNext probabilistically chooses the next edge in the graph to move down
-// based on the amount of pheremone on each edge. ChooseNext will not choose
+// based on the amount of pheromone on each edge. ChooseNext will not choose
 // an edge leading to the node the ant just visited unless it is the only edge
 // available on the node.
 func (a *SimpleAnt) ChooseNext(node *Node) (*Edge, bool) {
@@ -49,7 +49,7 @@ func (a *SimpleAnt) ChooseNext(node *Node) (*Edge, bool) {
 		return nil, true
 	}
 
-	total := a.sumPheremones(node.OutEdges)
+	total := a.sumpheromones(node.OutEdges)
 
 	// use RandomSrc to get random float64
 	randChan := make(chan float64)
@@ -59,7 +59,7 @@ func (a *SimpleAnt) ChooseNext(node *Node) (*Edge, bool) {
 	pos := 0.0
 	for _, e := range node.OutEdges {
 		if e.EndNodeId != a.LastNodeId {
-			pos += e.Pheremone()
+			pos += e.Pheromone()
 			if choice <= pos/total {
 				a.LastNodeId = node.Id
 				return e, false
@@ -70,7 +70,7 @@ func (a *SimpleAnt) ChooseNext(node *Node) (*Edge, bool) {
 	return node.OutEdges[len(node.OutEdges)-1], false
 }
 
-// MarkPath lays down pheremone based on the path the ant took to from home
+// MarkPath lays down pheromone based on the path the ant took to from home
 // to goal. MarkPath will "unloop" the path meaning that any loops in the
 // original path will be eliminated.
 func (a *SimpleAnt) MarkPath(g *Graph) {
@@ -102,14 +102,14 @@ func unloop(steps []int) []int {
 	return unlooped
 }
 
-// sumPheremones totals the pheremones present on the slice of edges passed in.
-// sumPheremones does not count pheremones from the edge the ant most recently
+// sumpheromones totals the pheromones present on the slice of edges passed in.
+// sumpheromones does not count pheromones from the edge the ant most recently
 // visited.
-func (a *SimpleAnt) sumPheremones(edges []*Edge) float64 {
+func (a *SimpleAnt) sumpheromones(edges []*Edge) float64 {
 	total := 0.0
 	for _, e := range edges {
 		if e.EndNodeId != a.LastNodeId {
-			total += e.Pheremone()
+			total += e.Pheromone()
 		}
 	}
 	return total

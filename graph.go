@@ -21,7 +21,7 @@ type Graph struct {
 	HomeIdx int
 	// Index of the Goal node
 	GoalIdx int
-	// How much the pheremone on each edge decreases after each round of ants
+	// How much the pheromone on each edge decreases after each round of ants
 	// reaches the goal.
 	DecayFactor float64
 }
@@ -135,17 +135,17 @@ func generateNodes(edges [][]*Edge, dim, homeNode, goalNode int) []*Node {
 	return nodes
 }
 
-// Dissipate subtracts g.DecayFactor pheremone from each edge in the graph.
+// Dissipate subtracts g.DecayFactor pheromone from each edge in the graph.
 func (g *Graph) Dissipate() {
 	for _, n := range g.Nodes {
 		for _, e := range n.InEdges {
-			e.AddPheremone(-1 * g.DecayFactor)
+			e.Addpheromone(-1 * g.DecayFactor)
 		}
 	}
 }
 
 // MarkPath takes in a list of nodeIds representing the path an ant followed
-// and adds depositAmt pheremone to each edge along the path.
+// and adds depositAmt pheromone to each edge along the path.
 func (g *Graph) MarkPath(steps []int, depositAmt float64) {
 	lastStep := steps[0]
 	for _, nodeId := range steps[0:] {
@@ -201,12 +201,12 @@ func (n *Node) runAnts(e *Edge) {
 	}
 }
 
-// MarkEdge adds depositAmt pheremone to the correct incoming edge in the
+// MarkEdge adds depositAmt pheromone to the correct incoming edge in the
 // node.
 func (n *Node) MarkEdge(from int, depositAmt float64) {
 	for _, e := range n.InEdges {
 		if e.StartNodeId == from {
-			e.AddPheremone(depositAmt)
+			e.Addpheromone(depositAmt)
 		}
 	}
 }
@@ -221,32 +221,32 @@ type Edge struct {
 	// EndNodeId is the Id of the ending node in the edge
 	EndNodeId int
 
-	// pheremone is the amount of pheremone currently on the edge
-	pheremone float64
+	// pheromone is the amount of pheromone currently on the edge
+	pheromone float64
 }
 
-// NewEdge creates a new edge with the starting pheremone amount of 10.0.
+// NewEdge creates a new edge with the starting pheromone amount of 10.0.
 func NewEdge(startId, endId int) *Edge {
 	return &Edge{
 		Path:        make(chan Ant, 5),
 		StartNodeId: startId,
 		EndNodeId:   endId,
-		pheremone:   10.0,
+		pheromone:   10.0,
 	}
 }
 
-// Pheremone returns the amount of pheremone present on the edge.
-func (e *Edge) Pheremone() float64 {
-	return e.pheremone
+// pheromone returns the amount of pheromone present on the edge.
+func (e *Edge) Pheromone() float64 {
+	return e.pheromone
 }
 
-// AddPheremone adds pheremone to the edge. AddPheremone will not allow the
-// amount of pheremone on the edge to go below 0.1.
-func (e *Edge) AddPheremone(f float64) {
-	e.pheremone = math.Max(e.pheremone+f, 0.1)
+// Addpheromone adds pheromone to the edge. Addpheromone will not allow the
+// amount of pheromone on the edge to go below 0.1.
+func (e *Edge) Addpheromone(f float64) {
+	e.pheromone = math.Max(e.pheromone+f, 0.1)
 }
 
-// String prints edges as "StartNodeId -> EndNodeId: Pheremone".
+// String prints edges as "StartNodeId -> EndNodeId: pheromone".
 func (e Edge) String() string {
-	return fmt.Sprintf("%d -> %d: %.2f", e.StartNodeId, e.EndNodeId, e.pheremone)
+	return fmt.Sprintf("%d -> %d: %.2f", e.StartNodeId, e.EndNodeId, e.pheromone)
 }
