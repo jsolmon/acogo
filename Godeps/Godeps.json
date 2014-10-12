@@ -1,0 +1,10 @@
+{
+	"ImportPath": "github.com/jsolmon/acogo",
+	"GoVersion": "go1.3.3",
+	"Deps": [
+		{
+			"ImportPath": "code.google.com/p/gographviz",
+			"Rev": "454bc64fdfa20468f637d99162e1edc60c1a6677"
+		}
+	]
+}
